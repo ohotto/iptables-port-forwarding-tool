@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 存储端口转发规则的文件
-RULES_FILE="port_forwarding_rules.txt"
+RULES_FILE=".port_forwarding_rules.txt"
 
 # 清除屏幕上方的行
 clear_lines() {
@@ -11,19 +11,19 @@ clear_lines() {
 
 # 函数：添加端口转发
 add_port_forward() {
-    read -p "请输入远程xray服务器的IP: " remote_xray_server_ip
-    read -p "请输入远程xray服务器的端口: " remote_xray_server_port
+    read -p "请输入远程服务器的IP: " remote_server_ip
+    read -p "请输入远程服务器的端口: " remote_server_port
     read -p "请输入中转机的公网IP: " out_interface_ip
     read -p "请输入本地入端口: " ingress_port
 
     # 添加iptables规则
-    iptables -t nat -A PREROUTING -p tcp -m tcp --dport ${ingress_port} -j DNAT --to-destination ${remote_xray_server_ip}:${remote_xray_server_port}
-    iptables -t nat -A POSTROUTING -p tcp -d ${remote_xray_server_ip}/32 -j SNAT --to-source ${out_interface_ip}
-    iptables -A FORWARD -s ${remote_xray_server_ip}/32 -j ACCEPT
-    iptables -A FORWARD -d ${remote_xray_server_ip}/32 -j ACCEPT
+    iptables -t nat -A PREROUTING -p tcp -m tcp --dport ${ingress_port} -j DNAT --to-destination ${remote_server_ip}:${remote_server_port}
+    iptables -t nat -A POSTROUTING -p tcp -d ${remote_server_ip}/32 -j SNAT --to-source ${out_interface_ip}
+    iptables -A FORWARD -s ${remote_server_ip}/32 -j ACCEPT
+    iptables -A FORWARD -d ${remote_server_ip}/32 -j ACCEPT
 
     # 保存规则到文件
-    echo "${remote_xray_server_ip},${remote_xray_server_port},${out_interface_ip},${ingress_port}" >> ${RULES_FILE}
+    echo "${remote_server_ip},${remote_server_port},${out_interface_ip},${ingress_port}" >> ${RULES_FILE}
     echo "端口转发规则已添加。"
 }
 
@@ -36,11 +36,11 @@ view_port_forward() {
     fi
 
     echo "已添加的端口转发规则："
-    echo "序号  远程xray服务器IP  远程xray服务器端口  中转机公网IP  本地入端口"
+    echo "序号  远程服务器IP  远程服务器端口  中转机公网IP  本地入端口"
     i=1
-    while IFS=, read -r remote_xray_server_ip remote_xray_server_port out_interface_ip ingress_port
+    while IFS=, read -r remote_server_ip remote_server_port out_interface_ip ingress_port
     do
-        echo "$i  $remote_xray_server_ip  $remote_xray_server_port  $out_interface_ip  $ingress_port"
+        echo "$i  $remote_server_ip  $remote_server_port  $out_interface_ip  $ingress_port"
         ((i++))
     done < ${RULES_FILE}
 }
@@ -65,17 +65,17 @@ delete_port_forward() {
 
     i=1
     deleted=0
-    while IFS=, read -r remote_xray_server_ip remote_xray_server_port out_interface_ip ingress_port
+    while IFS=, read -r remote_server_ip remote_server_port out_interface_ip ingress_port
     do
         if [[ ${i} -eq ${rule_number} ]]; then
             # 删除iptables规则
-            iptables -t nat -D PREROUTING -p tcp -m tcp --dport ${ingress_port} -j DNAT --to-destination ${remote_xray_server_ip}:${remote_xray_server_port}
-            iptables -t nat -D POSTROUTING -p tcp -d ${remote_xray_server_ip}/32 -j SNAT --to-source ${out_interface_ip}
-            iptables -D FORWARD -s ${remote_xray_server_ip}/32 -j ACCEPT
-            iptables -D FORWARD -d ${remote_xray_server_ip}/32 -j ACCEPT
+            iptables -t nat -D PREROUTING -p tcp -m tcp --dport ${ingress_port} -j DNAT --to-destination ${remote_server_ip}:${remote_server_port}
+            iptables -t nat -D POSTROUTING -p tcp -d ${remote_server_ip}/32 -j SNAT --to-source ${out_interface_ip}
+            iptables -D FORWARD -s ${remote_server_ip}/32 -j ACCEPT
+            iptables -D FORWARD -d ${remote_server_ip}/32 -j ACCEPT
             deleted=1
         else
-            echo "${remote_xray_server_ip},${remote_xray_server_port},${out_interface_ip},${ingress_port}" >> ${TEMP_FILE}
+            echo "${remote_server_ip},${remote_server_port},${out_interface_ip},${ingress_port}" >> ${TEMP_FILE}
         fi
         ((i++))
     done < ${RULES_FILE}
@@ -89,13 +89,35 @@ delete_port_forward() {
     fi
 }
 
+# 函数：卸载所有端口转发
+uninstall_all() {
+    if [[ ! -f ${RULES_FILE} ]]; then
+        echo "没有找到任何端口转发规则。"
+        return
+    fi
+
+    while IFS=, read -r remote_server_ip remote_server_port out_interface_ip ingress_port
+    do
+        # 删除iptables规则
+        iptables -t nat -D PREROUTING -p tcp -m tcp --dport ${ingress_port} -j DNAT --to-destination ${remote_server_ip}:${remote_server_port}
+        iptables -t nat -D POSTROUTING -p tcp -d ${remote_server_ip}/32 -j SNAT --to-source ${out_interface_ip}
+        iptables -D FORWARD -s ${remote_server_ip}/32 -j ACCEPT
+        iptables -D FORWARD -d ${remote_server_ip}/32 -j ACCEPT
+    done < ${RULES_FILE}
+
+    # 删除规则文件
+    rm -f ${RULES_FILE}
+    echo "所有端口转发规则已删除并卸载。"
+}
+
 while true; do
     clear
     echo "请选择功能："
     echo "1. 添加端口转发"
     echo "2. 查看端口转发"
     echo "3. 删除端口转发"
-    echo "4. 退出"
+    echo "4. 卸载所有端口转发"
+    echo "5. 退出"
     read -p "请输入选项: " choice
 
     case ${choice} in
@@ -111,6 +133,10 @@ while true; do
             delete_port_forward
             ;;
         4)
+            clear_lines 5
+            uninstall_all
+            ;;
+        5)
             echo "退出脚本。"
             exit 0
             ;;
