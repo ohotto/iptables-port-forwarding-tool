@@ -35,14 +35,18 @@ view_port_forward() {
         return
     fi
 
-    echo "已添加的端口转发规则："
-    echo "序号  远程服务器IP  远程服务器端口  中转机公网IP  本地入端口"
+    echo -e "                      已添加的端口转发规则                        "
+    echo -e "--------------------------------------------------------------------"
+    echo -e "序号 | 远程服务器IP  | 远程服务器端口 | 中转机公网IP  | 本地入端口     "
+    echo -e "--------------------------------------------------------------------"
+    
     i=1
     while IFS=, read -r remote_server_ip remote_server_port out_interface_ip ingress_port
     do
-        echo "$i  $remote_server_ip  $remote_server_port  $out_interface_ip  $ingress_port"
+        printf " %-4s| %-14s| %-15s| %-14s| %-15s\n" "$i" "$remote_server_ip" "$remote_server_port" "$out_interface_ip" "$ingress_port"
         ((i++))
     done < ${RULES_FILE}
+    echo -e "--------------------------------------------------------------------"
 }
 
 # 函数：删除端口转发
@@ -122,18 +126,18 @@ while true; do
 
     case ${choice} in
         1)
-            clear_lines 5
+            clear_lines 6
             add_port_forward
             ;;
         2)
             view_port_forward
             ;;
         3)
-            clear_lines 5
+            clear_lines 6
             delete_port_forward
             ;;
         4)
-            clear_lines 5
+            clear_lines 6
             uninstall_all
             ;;
         5)
